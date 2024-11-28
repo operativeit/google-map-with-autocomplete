@@ -1,4 +1,5 @@
 <?php
+
 namespace Trinityrank\GoogleMapWithAutocomplete;
 
 use Laravel\Nova\Panel;

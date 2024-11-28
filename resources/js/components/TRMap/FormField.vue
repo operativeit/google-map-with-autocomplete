@@ -4,12 +4,41 @@
         :errors="errors"
         :show-help-text="showHelpText"
     >
+        <template #default>
+           <div class="float-right">
+            <a
+              v-tooltip="{
+                placement: 'bottom',
+                distance: 10,
+                skidding: 0,
+                content: __('Go to current location'),
+              }"
+              class="rounded inline-block hover:bg-gray-200 dark:hover:bg-gray-800 focus:outline-none focus:ring"
+              tabindex="-1"
+              @click.stop.prevent="getCurrentLocation"
+             >
+              <BasicButton component="span">
+                <Icon type="location-marker" /> Current location
+              </BasicButton>
+             </a>
+           </div>
+          <form-label
+            :label-for="field.attribute"
+            :class="{ 'mb-2': showHelpText && field.helpText }"
+          >
+            {{ fieldLabel }}
+            <span v-if="field.required" class="text-red text-sm">{{
+              __("*")
+            }}</span>
+          </form-label>
+        </template>
         <template #field>
-            <div class="space-y-4">
+            <div class="rounded form-input-bordered">
                 <GMapMap
                     :center="map.center"
                     :zoom="map.zoom"
-                    style="height: 20rem; margin-top: 25px"
+                    @zoom_changed="zoomChanged"
+                    style="height: 20rem;"
                 >
                     <GMapMarker
                         :position="map.center"
@@ -17,26 +46,6 @@
                         :draggable="true"
                     />
                 </GMapMap>
-                <div class="flex">
-                    <div class="w-1/2 mr-6" v-if="!hideLatitude">
-                        <p class="mb-1">Latitude</p>
-                        <input
-                            type="text"
-                            class="w-full form-control form-input form-input-bordered"
-                            :class="errorClasses"
-                            v-model="latitude"
-                        />
-                    </div>
-                    <div class="w-1/2" v-if="!hideLongitude">
-                        <p class="mb-1">Longitude</p>
-                        <input
-                            type="text"
-                            class="w-full form-control form-input form-input-bordered"
-                            :class="errorClasses"
-                            v-model="longitude"
-                        />
-                    </div>
-                </div>
             </div>
         </template>
     </DefaultField>
@@ -55,108 +64,53 @@ export default {
     data() {
         return {
             map,
+            selectedPlace: false,  
             api_key: null,
-            latitude: null,
-            longitude: null,
             hideLatitude: false,
-            hideLongitude: false
+            hideLongitude: false,
         }
     },
-
     mounted() {
-        Nova.$on('latitude-update', data => {
-            this.latitude = data
-            this.map.center.lat = data
-        })
-        Nova.$on('longitude-update', data => {
-            this.longitude = data
-            this.map.center.lng = data
-            this.map.zoom = 16
-        })
     },
+    computed: {
+        /**
+         * Return the label that should be used for the field.
+         */
+         fieldLabel() {
+             // If the field name is purposefully an empty string, then let's show it as such
+            if (this.fieldName === "") {
+                return "";
+            }
 
+            return this.fieldName || this.field.name || this.field.singularLabel;
+        },
+    },
     methods: {
-        setInitialValue() {
-            if (this.field.hide_latitude) {
-                this.hideLatitude = this.field.hide_latitude
-            }
-            if (this.field.hide_longitude) {
-                this.hideLongitude = this.field.hide_longitude
-            }
-            this.map.center.lat = parseFloat(this.field.latitude)
-            this.map.center.lng = parseFloat(this.field.longitude)
-            this.latitude = parseFloat(this.field.latitude)
-            this.longitude = parseFloat(this.field.longitude)
-            this.map.zoom = this.field.zoom
-            if (this.resourceId) {
-                this.map.selectedPlace = true
-                this.map.zoom = 16
+       getCurrentLocation() {
+           if(!!navigator.geolocation) {
+               let position = navigator.geolocation.getCurrentPosition((pos) => {
+                   this.map.center.lat = pos.coords.latitude;
+                   this.map.center.lng = pos.coords.longitude;
+                   this.map.zoom = 16;
+               });
             }
         },
+        setInitialValue() {	    
+	    this.map = JSON.parse(this.field.value) || [];
+        },
 
-        /**
-         * Fill the given FormData object with the field's internal value.
-         */
         fill(formData) {
-            formData.append(this.field.attribute + '[latitude]', this.latitude)
-            formData.append(
-                this.field.attribute + '[longitude]',
-                this.longitude
-            )
+            formData.append(this.field.attribute, JSON.stringify(this.map) || [])
+        },
+
+        zoomChanged(level) {
+	    this.map.zoom = level;
         },
 
         markerDragend(marker) {
-            let lat = marker.latLng.lat()
-            let lng = marker.latLng.lng()
-
-            fetch(
-                `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${Nova.appConfig.api_key}`
-            )
-                .then(response => response.json())
-                .then(data => this.setPlace(data.results[0], true))
-        },
-
-        setPlace(place, dragend = false) {
-            for (const component of place.address_components) {
-                const componentType = component.types[0]
-                switch (componentType) {
-                    case 'postal_code': {
-                        Nova.$emit('zip-code-update', component.long_name)
-                        break
-                    }
-                    case 'postal_code_suffix': {
-                        Nova.$emit('zip-code-update', component.long_name)
-                        break
-                    }
-                    case 'locality': {
-                        Nova.$emit('city-update', component.long_name)
-                        break
-                    }
-                    case 'administrative_area_level_1': {
-                        Nova.$emit('state-update', component.long_name)
-                        break
-                    }
-                    case 'country':
-                        Nova.$emit('country-update', component.long_name)
-                        break
-                }
-            }
-
-            Nova.$emit('address-update', place.formatted_address)
-
-            if (dragend) {
-                this.latitude = place.geometry.location.lat
-                this.longitude = place.geometry.location.lng
-                this.map.center.lat = place.geometry.location.lat
-                this.map.center.lng = place.geometry.location.lng
-            } else {
-                this.map.center.lat = place.geometry.location.lat()
-                this.map.center.lng = place.geometry.location.lng()
-                this.latitude = place.geometry.location.lat()
-                this.longitude = place.geometry.location.lng()
-            }
-            this.map.zoom = 16
-        }
+	    this.map.center.lat = marker.latLng.lat()
+            this.map.center.lng = marker.latLng.lng()
+       },
     }
 }
 </script>

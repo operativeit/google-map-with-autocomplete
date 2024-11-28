@@ -1,4 +1,5 @@
 <?php
+
 namespace Trinityrank\GoogleMapWithAutocomplete;
 
 use Illuminate\Support\ServiceProvider;
@@ -15,8 +16,8 @@ class FieldServiceProvider extends ServiceProvider
     public function boot()
     {
         Nova::serving(function (ServingNova $event) {
-            Nova::script('google-map-with-autocomplete', __DIR__ . '/../dist/js/field.js');
-            Nova::style('google-map-with-autocomplete', __DIR__ . '/../dist/css/field.css');
+            Nova::script('google-map-with-autocomplete', __DIR__.'/../dist/js/field.js');
+            Nova::style('google-map-with-autocomplete', __DIR__.'/../dist/css/field.css');
             Nova::provideToScript([
                 'api_key' => config('nova-google-maps.google_maps_api_key'),
             ]);
@@ -30,7 +31,7 @@ class FieldServiceProvider extends ServiceProvider
      */
     public function register()
     {
-        $config_path = dirname(__DIR__) . '/publishable/config/nova-google-maps.php';
+        $config_path = dirname(__DIR__).'/publishable/config/nova-google-maps.php';
 
         $this->publishes(
             [$config_path => config_path('nova-google-maps.php')],

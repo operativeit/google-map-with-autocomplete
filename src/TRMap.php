@@ -1,8 +1,9 @@
 <?php
+
 namespace Trinityrank\GoogleMapWithAutocomplete;
 
-use Laravel\Nova\Fields\Field;
 use Illuminate\Support\Str;
+use Laravel\Nova\Fields\Field;
 use Laravel\Nova\Http\Requests\NovaRequest;
 
 class TRMap extends Field
@@ -58,20 +59,13 @@ class TRMap extends Field
 
     protected function fillAttributeFromRequest(NovaRequest $request, $requestAttribute, $model, $attribute)
     {
-        foreach ($request->input($attribute) as $attr => $data) {
-            if ($data != 'null') {
-                $model->setAttribute($attr, $data);
-            }
-        }
+        \Log::info(['fill', $request->input($attribute)]);
+        $model->setAttribute($attribute, $request->input($attribute));
+
     }
 
     public function resolve($resource, $attribute = null)
     {
-        if ($resource->getAttribute('latitude')) {
-            $this->latitude(floatval($resource->getAttribute('latitude')));
-        }
-        if ($resource->getAttribute('longitude')) {
-            $this->longitude(floatval($resource->getAttribute('longitude')));
-        }
+        $this->value = $resource->getAttribute($this->attribute);
     }
 }
